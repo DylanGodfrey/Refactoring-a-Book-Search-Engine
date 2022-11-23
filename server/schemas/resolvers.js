@@ -10,24 +10,22 @@ const resolvers = {
                 $or: [{ _id: user ? user._id : params.id }, { username: params.username }],
             });
         },
-
-        async login({ body }, res) {
-
-            const user = await User.findOne({ $or: [{ username: body.username }, { email: body.email }] });
-            if (!user) {
-                return res.status(400).json({ message: "User not found" });
-            }
-            const correctPw = await user.isCorrectPassword(body.password);
-
-            if (!correctPw) {
-                return res.status(400).json({ message: "Incorrect password"});
-            }
-            // If user is able to login, sign token using their info
-            const token = signToken(user);
-            res.json({ token, user });
-        },
     },
     Mutation:{
+        async login(_, {email, password}) {
+            const user = await User.findOne({email});
+            if (!user) {
+                throw new AuthenticationError('Login information is invalid.');
+            }
+            const correctPw = await user.isCorrectPassword(password);
+
+            if (!correctPw) {
+                throw new AuthenticationError('Login information is invalid.');
+            }
+            // If user is able to login, sign their token
+            const token = signToken(user);
+            return {token, user};
+        },
         // CREATE new User from body
         async createUser({ body }, res) {
             const user = await User.create(body);
