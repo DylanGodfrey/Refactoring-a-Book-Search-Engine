@@ -1,14 +1,14 @@
 const { User } = require('../models');
 const { signToken } = require('../utils/auth');
+const {AuthenticationError} = require('apollo-server-express');
+
 
 const resolvers = {
     Query: {
         // GET single user
         async me(parent, args, context) {
-            return await User.findOne({
-                // Logical 'OR' for MongoDB to findONE User based on the user id or username
-                $or: [{ _id: user ? user._id : params.id }, { username: params.username }],
-            });
+            if (context.user) return User.findOne({_id: context.user._id});
+            throw new AuthenticationError("You need to be logged in!")
         },
     },
     Mutation:{
@@ -28,42 +28,36 @@ const resolvers = {
         },
         // CREATE new User from body
         async addUser(parent, args) {
-            const user = await User.create(body);
-            if (!user) {
-                return res.status(400).json({ message: "Unable to create user" });
-            }
+            const user = await User.create(args);
             // If user is created, sign token using their info (log them in)
             const token = signToken(user);
-            res.json({ token, user });
+            return { token, user };
         },
         // DELETE a book from a user
         async removeBook(_, {bookId}, context) {
             // Find the matching user and update their savedBooks
-            const updatedUser = await User.findOneAndUpdate(
-                { _id: user._id },
-                { $pull: { savedBooks: { bookId: params.bookId } } },
-                { new: true }
-            );
-            if (!updatedUser) {
-                return res.status(404).json({ message: "Couldn't find user with this id!" });
+            if (context.user) {
+                return User.findOneAndUpdate(
+                    {_id: context.user._id},
+                    {$pull: {savedBooks: {bookId: bookId}}},
+                    {new: true}
+                );
             }
-            return res.json(updatedUser);
+            throw new AuthenticationError('You need to be logged in to do this!');
         },
         // UPDATE savedBooks of a user
         async saveBook(_, args, context) {
-            try {
+            if (context.user) {
                 // Append the new book to this user's savedBooks
-                const updatedUser = await User.findOneAndUpdate(
-                    { _id: user._id },
-                    { $addToSet: { savedBooks: body } },
-                    { new: true, runValidators: true }
+                const user = await User.findOneAndUpdate(
+                    {_id: context.user._id},
+                    {$addToSet: {savedBooks: args}},
+                    {new: true, runValidators: true}
                 );
                 // Return the new user
-                return res.json(updatedUser);
-            } catch (err) {
-                console.log(err);
-                return res.status(400).json(err);
+                return user;
             }
+            throw new AuthenticationError('You need to be logged in!');
         },
     }
 }
