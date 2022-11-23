@@ -4,7 +4,7 @@ const { signToken } = require('../utils/auth');
 const resolvers = {
     Query: {
         // GET single user
-        async singleUser(parent, { user = null, params }) {
+        async me(parent, args, context) {
             return await User.findOne({
                 // Logical 'OR' for MongoDB to findONE User based on the user id or username
                 $or: [{ _id: user ? user._id : params.id }, { username: params.username }],
@@ -27,7 +27,7 @@ const resolvers = {
             return {token, user};
         },
         // CREATE new User from body
-        async createUser({ body }, res) {
+        async addUser(parent, args) {
             const user = await User.create(body);
             if (!user) {
                 return res.status(400).json({ message: "Unable to create user" });
@@ -37,7 +37,7 @@ const resolvers = {
             res.json({ token, user });
         },
         // DELETE a book from a user
-        async deleteBook({ user, params }, res) {
+        async removeBook(_, {bookId}, context) {
             // Find the matching user and update their savedBooks
             const updatedUser = await User.findOneAndUpdate(
                 { _id: user._id },
@@ -50,7 +50,7 @@ const resolvers = {
             return res.json(updatedUser);
         },
         // UPDATE savedBooks of a user
-        async saveBook({ user, body }, res) {
+        async saveBook(_, args, context) {
             try {
                 // Append the new book to this user's savedBooks
                 const updatedUser = await User.findOneAndUpdate(
